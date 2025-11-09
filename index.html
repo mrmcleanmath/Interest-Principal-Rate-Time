@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simple Interest Grid — Mr. McLean Math</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --card: #121832;
+    --ink: #eef3ff;
+    --muted: #a8b3d1;
+    --accent: #5dd0ff;
+    --good: #2ecc71;
+    --bad: #ff5c5c;
+    --outline: #31406b;
+  }
+  body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"; background:var(--bg); color:var(--ink); line-height:1.4; }
+  header { padding:16px clamp(12px,3vw,28px); border-bottom:1px solid var(--outline); display:grid; gap:12px; }
+  .title-row{ display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  h1{ font-size:clamp(18px,2.6vw,28px); margin:0; }
+  .subtitle{ color:var(--muted); font-size:clamp(14px,1.6vw,16px); }
+  .controls{ display:flex; flex-wrap:wrap; gap:10px 14px; align-items:center; }
+  .seg{ display:inline-flex; background:var(--card); border:1px solid var(--outline); border-radius:10px; overflow:hidden; }
+  .seg button{ background:transparent; color:var(--ink); border:0; padding:8px 12px; cursor:pointer; font-weight:600; font-size:14px; }
+  .seg button[aria-pressed="true"]{ background:#1a2246; outline:2px solid var(--accent); }
+  .toggle{ display:inline-flex; align-items:center; gap:6px; padding:8px 10px; background:var(--card); border:1px solid var(--outline); border-radius:10px; font-size:14px; }
+  .toggle input{ accent-color:var(--accent); }
+  .actions{ display:flex; gap:10px; flex-wrap:wrap; }
+  .btn{ background:var(--accent); color:#001020; font-weight:800; border:none; padding:10px 14px; border-radius:12px; cursor:pointer; font-size:14px; }
+  .btn.secondary{ background:#1a2246; color:var(--ink); border:1px solid var(--outline); }
+  .instruction{ margin-top:8px; padding:10px 12px; background:#0e1530; border:1px dashed var(--outline); border-radius:10px; font-size:clamp(15px,1.9vw,18px); }
+  main{ padding:18px clamp(12px,3vw,28px) 80px; }
+  .grid{ display:grid; grid-template-columns:repeat(3, minmax(240px,1fr)); gap:clamp(10px,1.5vw,16px); }
+  .cell{ background:var(--card); border:1px solid var(--outline); border-radius:16px; padding:12px; display:grid; grid-template-rows:auto 1fr auto; gap:10px; }
+  .cell header{ border:0; padding:0; }
+  .badge{ display:inline-flex; align-items:center; gap:6px; background:#0d1330; border:1px solid var(--outline); border-radius:999px; padding:4px 10px; font-size:12px; color:var(--muted); width:max-content; }
+  .kv{ display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center; font-size:clamp(16px,2.2vw,20px); }
+  .kv label{ color:var(--muted); }
+  .val{ font-weight:700; font-variant-numeric:tabular-nums; max-width:220px; } /* prevent bleed */
+  .val.mono{ font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+  .val input{ width:100%; font-size:clamp(16px,2.2vw,20px); padding:8px 10px; border-radius:10px; border:1px solid var(--outline); background:#0f1738; color:var(--ink); outline:none; }
+  .val input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(93,208,255,0.25); }
+  .status{ display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .mark{ font-weight:800; letter-spacing:0.3px; }
+  .mark.good{ color:var(--good); }
+  .mark.bad{ color:var(--bad); }
+  .rounding-hint{ font-size:12px; color:var(--warn); margin-top:-4px; }
+  .steps{ background:#0b1130; border:1px solid var(--outline); border-radius:12px; padding:8px 10px; font-size:14px; color:var(--muted); white-space:pre-wrap; }
+  .footbar{ position:fixed; inset:auto 0 0 0; background:#0a0f26; border-top:1px solid var(--outline); padding:10px clamp(12px,3vw,28px); display:flex; gap:12px; align-items:center; justify-content:space-between; }
+  .brand{ color:var(--muted); font-size:13px; }
+  .sr-only{ position:absolute!important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+  .hc :root, .hc body { background:#000; }
+  .hc body{ color:#fff; }
+  .hc .cell, .hc .toggle, .hc .seg, .hc .instruction{ background:#000!important; border-color:#fff!important; }
+  .hc .val input{ background:#000!important; border-color:#fff!important; color:#fff!important; }
+  .hc .btn.secondary{ background:#000!important; border-color:#fff!important; color:#fff!important; }
+  @media (max-width:900px){ .grid{ grid-template-columns:repeat(2, minmax(220px,1fr)); } }
+  @media (max-width:620px){ .grid{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<a class="sr-only" href="#grid" id="skip">Skip to worksheet</a>
+<header>
+  <div class="title-row">
+    <h1>Simple Interest Worksheet (I = P·r·t)</h1>
+    <div class="subtitle">Fill the missing value. Time is in <strong>months</strong>. Rates are annual.</div>
+  </div>
+  <div class="controls" role="group" aria-label="Worksheet controls">
+    <div class="seg" role="tablist" aria-label="Difficulty">
+      <button id="dif-e" role="tab" aria-pressed="true" title="Easy">🟢 Easy</button>
+      <button id="dif-m" role="tab" aria-pressed="false" title="Medium">🟡 Medium</button>
+      <button id="dif-h" role="tab" aria-pressed="false" title="Hard">🔴 Hard</button>
+      <button id="dif-r" role="tab" aria-pressed="false" title="Random">🎲 Random</button>
+    </div>
+    <div class="seg" role="tablist" aria-label="Set size">
+      <button id="sz-5"  role="tab" aria-pressed="false">5</button>
+      <button id="sz-10" role="tab" aria-pressed="true">10</button>
+      <button id="sz-15" role="tab" aria-pressed="false">15</button>
+    </div>
+    <label class="toggle" title="Sound effects"><input type="checkbox" id="sound" checked />Sound</label>
+    <label class="toggle" title="High contrast"><input type="checkbox" id="hc" />High contrast</label>
+    <div class="actions">
+      <button class="btn" id="newSheet">Generate Worksheet</button>
+      <button class="btn secondary" id="revealAll">Reveal all</button>
+      <button class="btn secondary" id="hideAll">Hide all</button>
+    </div>
+  </div>
+  <div class="instruction" aria-live="polite">
+    Use <strong>I = P · r · t</strong>. Enter rates as <strong>percent (e.g., 7%)</strong> or <strong>decimal fraction (0.07)</strong>. Enter time in <strong>months</strong> (e.g., 6 or 6 months). Dollar sign optional for money.
+  </div>
+</header>
+
+<main>
+  <div id="grid" class="grid" role="region" aria-label="Worksheet grid"></div>
+  <div id="live" class="sr-only" aria-live="polite"></div>
+</main>
+
+<footer class="footbar">
+  <div class="brand">Created by Mr. McLean Math.</div>
+  <div class="brand">Keyboard: Enter = Check • Esc = Clear • Reveal buttons below.</div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  window.addEventListener("error",(e)=>console.error(e.message,e.filename,e.lineno));
+
+  // ---------- format helpers ----------
+  const rnd2 = (x)=> Math.round((+x + Number.EPSILON) * 100) / 100;
+  function formatSpacesThousands(n, minFrac=2){
+    const num = Number(n);
+    const [intPartRaw, fracRaw=""] = num.toFixed(Math.max(0,minFrac)).split(".");
+    const intPart = intPartRaw.replace(/\B(?=(\d{3})+(?!\d))/g," ");
+    return fracRaw.length ? `${intPart}.${fracRaw}` : intPart;
+  }
+  const fmtMoney = (n)=> `$${formatSpacesThousands(rnd2(n),2)}`;
+  const fmtRatePercent = (p)=> `${(+p).toFixed(2)}%`;
+  const fmtMonths = (m)=> { m = Math.round(m); return `${m} ${m===1?"month":"months"}`; };
+
+  // ---------- parsing ----------
+  function parseRateInput(str){
+    if (typeof str!=="string") return null;
+    const s = str.trim().toLowerCase();
+    if (!s) return null;
+    if (s.includes("%")){
+      const n = parseFloat(s.replace("%","").replace(",","."));
+      if (isNaN(n)) return null;
+      return n/100;
+    } else {
+      const n = parseFloat(s.replace(",","."));
+      if (isNaN(n) || n<=0 || n>=1) return null;
+      return n;
+    }
+  }
+  function parseMoneyInput(str){
+    if (typeof str!=="string") return null;
+    const s = str.replace(/\$/g,"").replace(/\s/g,"").replace(",",".").trim();
+    const n = parseFloat(s);
+    return (isNaN(n) || n<=0)? null : n;
+  }
+  function parseTimeInput(str){
+    if (typeof str!=="string") return {years:null, monthsInt:null};
+    const s = str.trim().toLowerCase();
+    if (!s) return {years:null, monthsInt:null};
+    if (/\bmo(nth|nths)?\b|\bmonths?\b/.test(s) || /^[0-9]+$/.test(s)){
+      const m = parseInt(s.replace(/[^\d]/g,""),10);
+      if (isNaN(m) || m<=0 || m>12) return {years:null, monthsInt:null};
+      return {years:m/12, monthsInt:m};
+    }
+    const n = parseFloat(s.replace(",","."));
+    if (isNaN(n) || n<=0 || n>1) return {years:null, monthsInt:null};
+    const maybeMonths = Math.round(n*12);
+    const monthsInt = Math.abs(n-(maybeMonths/12))<1e-9 ? maybeMonths : null;
+    return {years:n, monthsInt};
+  }
+
+  // ---------- audio ----------
+  let audioCtx=null;
+  function beep(freq,dur){
+    try{
+      if (!document.getElementById("sound").checked) return;
+      if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.connect(g); g.connect(audioCtx.destination);
+      o.type="sine"; o.frequency.value=freq;
+      g.gain.setValueAtTime(0.0001,audioCtx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.2,audioCtx.currentTime+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+dur);
+      o.start(); o.stop(audioCtx.currentTime+dur+0.02);
+    }catch{}
+  }
+  const beepGood=()=>beep(880,0.12);
+  const beepBad =()=>beep(220,0.20);
+
+  // ---------- RNG / dev ----------
+  const url=new URL(location.href);
+  const DEV = url.searchParams.get("dev")==="1";
+  let _seed = DEV?1234567:Math.floor(Math.random()*1e9);
+  function rand(){ let x=_seed^=_seed<<13; x^=x>>>17; x^=x<<5; _seed=x>>>0; return (_seed%1e6)/1e6; }
+  const choice = (a)=> a[Math.floor(rand()*a.length)];
+  const randint = (a,b)=> Math.floor(rand()*(b-a+1))+a;
+
+  // ---------- generation rules ----------
+  const DIFF={EASY:"easy", MED:"med", HARD:"hard", RAND:"rand"};
+  let currentDiff=DIFF.MED, sheetSize=10;
+  function pickDifficulty(){ return currentDiff!==DIFF.RAND? currentDiff : choice([DIFF.EASY,DIFF.MED,DIFF.HARD]); }
+
+  const MissingByTier={
+    [DIFF.EASY]:["I","r","P"],
+    [DIFF.MED]: ["I","r","P"],
+    [DIFF.HARD]:["I","r","P","t"],
+  };
+  const TimeByTier={
+    [DIFF.EASY]:[6,12],
+    [DIFF.MED]: [3,6,9,12],
+    [DIFF.HARD]:[1,2,3,4,5,6,7,8,9,10,11,12],
+  };
+
+  function genOneProblem(tier){
+    let miss=choice(MissingByTier[tier]);
+    if (tier!==DIFF.HARD && miss==="t") miss="I";
+
+    let Pmin=100,Pmax=10000,rMin=1,rMax=12;
+    if (tier===DIFF.MED){ Pmin=1000; Pmax=120000; rMin=1; rMax=18; }
+    if (tier===DIFF.HARD){ Pmin=200; Pmax=240000; rMin=0.5; rMax=30; }
+
+    const P = rnd2(randint(Pmin,Pmax) + (rand()<0.3? rand():0));
+    const rPercent = rnd2(rand()*(rMax-rMin)+rMin);
+
+    // Choose time in months
+    let months = choice(TimeByTier[tier]);
+
+    // === NEW RULE ===
+    // If the missing variable is RATE in EASY or MEDIUM, force t = 12 months.
+    if ((tier===DIFF.EASY || tier===DIFF.MED) && miss==="r") {
+      months = 12;
+    }
+
+    // HARD allows rate with any months (or t missing handled below)
+    if (tier===DIFF.HARD && miss==="t" && Math.random()<0.7) months=null;
+
+    let p=P, r=rPercent/100, tYears=months?(months/12):null, I=null;
+
+    if (miss==="t"){
+      const m = choice(TimeByTier[DIFF.HARD]);
+      tYears = m/12;
+      p = rnd2(randint(Pmin,Pmax));
+      const rp = rnd2(rand()*(rMax-rMin)+rMin); r = rp/100;
+      I = rnd2(p*r*tYears);
+      months = null;
+      return {P:p, r:r, months:null, I:I, miss:"t"};
+    }
+    if (miss==="r"){
+      // months already set above (12 for Easy/Med; chosen for Hard)
+      tYears = months/12;
+      const rp2 = rnd2(rand()*(rMax-rMin)+rMin); r=rp2/100;
+      I = rnd2(p*r*tYears);
+      return {P:p, r:null, months:months, I:I, miss:"r"};
+    }
+    if (miss==="P"){
+      if (!months) months=choice(TimeByTier[tier===DIFF.HARD?DIFF.HARD:DIFF.MED]);
+      tYears = months/12;
+      const rp3 = rnd2(rand()*(rMax-rMin)+rMin); r=rp3/100;
+      const targetP = rnd2(randint(Pmin,Pmax));
+      const targetI = rnd2(targetP*r*tYears);
+      return {P:null, r:r, months:months, I:targetI, miss:"P"};
+    }
+    if (miss==="I"){
+      if (!months) months=choice(TimeByTier[tier===DIFF.HARD?DIFF.HARD:DIFF.MED]);
+      tYears = months/12;
+      I = rnd2(p*r*tYears);
+      return {P:p, r:r, months:months, I:null, miss:"I"};
+    }
+    I = rnd2(p*r*((months||12)/12));
+    return {P:p, r:r, months:months, I:null, miss:"I"};
+  }
+
+  function buildWorksheet(){
+    const grid=document.getElementById("grid");
+    grid.innerHTML="";
+    const tier=pickDifficulty();
+
+    const allowed=MissingByTier[tier].slice();
+    const problems=[];
+    for (let i=0;i<sheetSize;i++){
+      const miss = allowed[i % allowed.length];
+      let cell;
+      for (let tries=0; tries<50; tries++){
+        cell = genOneProblem(tier);
+        if (cell.miss===miss) break;
+      }
+      problems.push(cell);
+    }
+    problems.forEach((prob,idx)=> grid.appendChild(renderCell(prob, idx+1)));
+    announce(`New ${tier} worksheet with ${sheetSize} items generated.`);
+  }
+
+  // ---------- cell logic (with rounding requirements) ----------
+  function renderCell(prob, number){
+    const {P,r,months,I,miss}=prob;
+    const card=document.createElement("section");
+    card.className="cell"; card.setAttribute("role","group");
+    card.setAttribute("aria-label",`Problem ${number}`);
+    const head=document.createElement("header");
+    head.innerHTML=`<span class="badge">#${number}</span>`;
+
+    const kv=document.createElement("div"); kv.className="kv";
+
+    const makeStatic=(label,value,kind)=>{
+      const L=document.createElement("label"); L.textContent=label;
+      const V=document.createElement("div"); V.className="val";
+      if (kind==="money") V.textContent=fmtMoney(value);
+      else if (kind==="rate") V.textContent=fmtRatePercent(value*100);
+      else if (kind==="months") V.textContent=fmtMonths(value);
+      else V.textContent=String(value);
+      kv.appendChild(L); kv.appendChild(V);
+    };
+
+    const inputId = `inp-${Math.random().toString(36).slice(2)}`;
+    const makeInput=(label,placeholder)=>{
+      const L=document.createElement("label"); L.setAttribute("for",inputId); L.textContent=label;
+      const V=document.createElement("div"); V.className="val mono";
+      const inp=document.createElement("input");
+      inp.id=inputId; inp.placeholder=placeholder; inp.autocomplete="off"; inp.inputMode="decimal";
+      V.appendChild(inp); kv.appendChild(L); kv.appendChild(V); return inp;
+    };
+
+    let inputEl=null, answerChecker=null, showStepsText="", roundingHint="";
+    const tYears=(months!=null)? months/12 : null;
+
+    function eqInt(a,b){ return Math.round(+a)===Math.round(+b); }
+
+    if (miss==="P"){
+      inputEl = makeInput("Principal (P)","$ …");
+      makeStatic("Rate (r)", r, "rate");
+      if (months!=null) makeStatic("Time (t)", months, "months");
+      makeStatic("Interest (I)", I, "money");
+      const correct = I / (r * tYears);
+      const expectedWhole = Math.round(correct);
+      roundingHint = "Round your answer to the nearest whole dollar.";
+      showStepsText =
+        `Formula: P = I / (r · t)\n`+
+        `Substitute: P = ${fmtMoney(I)} / (${(r*100).toFixed(2)}% · ${fmtMonths(months)})\n`+
+        `Compute: P ≈ ${fmtMoney(correct)} → Round: $${expectedWhole}`;
+      answerChecker = (raw)=>{
+        const val = parseMoneyInput(raw);
+        return val!=null && eqInt(val, expectedWhole);
+      };
+    } else if (miss==="I"){
+      makeStatic("Principal (P)", P, "money");
+      makeStatic("Rate (r)", r, "rate");
+      if (months!=null) makeStatic("Time (t)", months, "months");
+      inputEl = makeInput("Interest (I)","$ …");
+      const correct = P * r * tYears;
+      const expectedWhole = Math.round(correct);
+      roundingHint = "Round your answer to the nearest whole dollar.";
+      showStepsText =
+        `Formula: I = P · r · t\n`+
+        `Substitute: I = ${fmtMoney(P)} · ${(r*100).toFixed(2)}% · ${fmtMonths(months)}\n`+
+        `Compute: I ≈ ${fmtMoney(correct)} → Round: $${expectedWhole}`;
+      answerChecker = (raw)=>{
+        const val = parseMoneyInput(raw);
+        return val!=null && eqInt(val, expectedWhole);
+      };
+    } else if (miss==="r"){
+      makeStatic("Principal (P)", P, "money");
+      if (months!=null) makeStatic("Time (t)", months, "months");
+      makeStatic("Interest (I)", I, "money");
+      inputEl = makeInput("Rate (r)","9% or 0.09");
+      const correctR = I / (P * tYears);
+      const expectedPctWhole = Math.round(correctR * 100);
+      roundingHint = "Round your answer to the nearest whole percent.";
+      showStepsText =
+        `Formula: r = I / (P · t)\n`+
+        `Substitute: r = ${fmtMoney(I)} / (${fmtMoney(P)} · ${fmtMonths(months)})\n`+
+        `Compute: r ≈ ${(correctR*100).toFixed(2)}% → Round: ${expectedPctWhole}%`;
+      answerChecker = (raw)=>{
+        const rIn = parseRateInput(raw);
+        if (rIn==null) return false;
+        const userPct = Math.round(rIn*100);
+        return userPct === expectedPctWhole;
+      };
+    } else if (miss==="t"){
+      makeStatic("Principal (P)", P, "money");
+      makeStatic("Rate (r)", r, "rate");
+      makeStatic("Interest (I)", I, "money");
+      inputEl = makeInput("Time (t)","e.g., 6 months");
+      const correctYears = I / (P * r);
+      const expectedMonths = Math.round(correctYears*12);
+      roundingHint = "Round your answer to the nearest whole month.";
+      showStepsText =
+        `Formula: t = I / (P · r)\n`+
+        `Substitute: t = ${fmtMoney(I)} / (${fmtMoney(P)} · ${(r*100).toFixed(2)}%)\n`+
+        `Compute: t ≈ ${(correctYears*12).toFixed(2)} months → Round: ${expectedMonths} months`;
+      answerChecker = (raw)=>{
+        const t = parseTimeInput(raw);
+        if (t.years==null) return false;
+        const userMonths = Math.round(t.years*12);
+        return userMonths === expectedMonths;
+      };
+    }
+
+    const status=document.createElement("div"); status.className="status";
+    const mark=document.createElement("div"); mark.className="mark"; mark.textContent="—";
+    status.appendChild(mark);
+
+    const btns=document.createElement("div"); btns.style.display="flex"; btns.style.gap="8px";
+    const btnCheck=document.createElement("button"); btnCheck.className="btn secondary"; btnCheck.textContent="Check";
+    const btnSteps=document.createElement("button"); btnSteps.className="btn secondary"; btnSteps.textContent="Show steps";
+    const btnReveal=document.createElement("button"); btnReveal.className="btn secondary"; btnReveal.textContent="Reveal";
+    btns.append(btnCheck,btnSteps,btnReveal); status.appendChild(btns);
+
+    const hint=document.createElement("div"); hint.className="rounding-hint"; hint.textContent=roundingHint;
+
+    const steps=document.createElement("pre"); steps.className="steps"; steps.style.display="none"; steps.textContent=showStepsText;
+
+    function computeCorrectDisplay(prob, which){
+      const {P,r,months,I,miss}=prob;
+      if (which==="P" || (which==null && miss==="P")){
+        const m = months??12, tY=m/12, val = I/(r*tY);
+        return { text: `$${Math.round(val)}` };
+      }
+      if (which==="I" || (which==null && miss==="I")){
+        const m = months??12, tY=m/12, val = P*r*tY;
+        return { text: `$${Math.round(val)}` };
+      }
+      if (which==="r" || (which==null && miss==="r")){
+        const m = months??12, tY=m/12, pct = (I/(P*tY))*100;
+        return { text: `${Math.round(pct)}%` };
+      }
+      if (which==="t" || (which==null && miss==="t")){
+        const monthsVal = Math.round( (I/(P*r))*12 );
+        return { text: `${monthsVal} ${monthsVal===1?"month":"months"}` };
+      }
+      return { text:"" };
+    }
+
+    function revealAnswer(){
+      if (!inputEl) return;
+      const { text } = computeCorrectDisplay(prob, miss);
+      if (miss==="P" || miss==="I"){ inputEl.value = text.replace(/^\$/,""); }
+      else { inputEl.value = text; }
+      doCheck();
+    }
+
+    function doCheck(){
+      if (!inputEl) return;
+      const ok = answerChecker(inputEl.value);
+      if (ok){
+        mark.textContent="Correct!"; mark.className="mark good";
+        inputEl.setAttribute("disabled","true"); beepGood();
+        announce(`Problem ${number} correct`);
+      } else {
+        mark.textContent="✖ Incorrect"; mark.className="mark bad"; beepBad();
+        announce(`Problem ${number} incorrect`);
+      }
+    }
+
+    btnCheck.addEventListener("click",doCheck);
+    btnSteps.addEventListener("click",()=>{ steps.style.display = steps.style.display==="none" ? "block":"none"; });
+    btnReveal.addEventListener("click",revealAnswer);
+    if (inputEl){
+      inputEl.addEventListener("keydown",(e)=>{
+        if (e.key==="Enter"){ e.preventDefault(); doCheck(); }
+        if (e.key==="Escape"){ inputEl.value=""; mark.textContent="—"; mark.className="mark"; }
+      });
+    }
+
+    card.appendChild(head);
+    card.appendChild(kv);
+    card.appendChild(hint);
+    card.appendChild(status);
+    card.appendChild(steps);
+    return card;
+  }
+
+  // ---------- UI wiring ----------
+  const difBtns={ EASY:document.getElementById("dif-e"), MED:document.getElementById("dif-m"), HARD:document.getElementById("dif-h"), RAND:document.getElementById("dif-r") };
+  function setDiff(d){
+    currentDiff=d;
+    difBtns.EASY.setAttribute("aria-pressed", d==="easy" ?"true":"false");
+    difBtns.MED .setAttribute("aria-pressed", d==="med"  ?"true":"false");
+    difBtns.HARD.setAttribute("aria-pressed", d==="hard" ?"true":"false");
+    difBtns.RAND.setAttribute("aria-pressed", d==="rand" ?"true":"false");
+  }
+  difBtns.EASY.addEventListener("click",()=>setDiff("easy"));
+  difBtns.MED .addEventListener("click",()=>setDiff("med"));
+  difBtns.HARD.addEventListener("click",()=>setDiff("hard"));
+  difBtns.RAND.addEventListener("click",()=>setDiff("rand"));
+
+  const sizeBtns={ 5:document.getElementById("sz-5"), 10:document.getElementById("sz-10"), 15:document.getElementById("sz-15") };
+  function markSize(sz){
+    Object.values(sizeBtns).forEach(b=>b.setAttribute("aria-pressed","false"));
+    sizeBtns[sz].setAttribute("aria-pressed","true"); sheetSize=+sz;
+  }
+  sizeBtns[5].addEventListener("click", ()=>markSize(5));
+  sizeBtns[10].addEventListener("click",()=>markSize(10));
+  sizeBtns[15].addEventListener("click",()=>markSize(15));
+
+  document.getElementById("newSheet").addEventListener("click",()=>{
+    _seed = DEV?1234567:Math.floor(Math.random()*1e9);
+    buildWorksheet(); document.getElementById("grid").scrollIntoView({behavior:"smooth", block:"start"});
+  });
+  document.getElementById("revealAll").addEventListener("click",()=>{
+    document.querySelectorAll(".cell").forEach(cell=>{
+      const btns = cell.querySelectorAll(".btn.secondary");
+      const btnReveal = btns[2]; if (btnReveal) btnReveal.click();
+    });
+  });
+  document.getElementById("hideAll").addEventListener("click",()=>{
+    document.querySelectorAll(".cell").forEach(cell=>{
+      const input=cell.querySelector("input[id^='inp-']");
+      const mark=cell.querySelector(".mark");
+      const steps=cell.querySelector(".steps");
+      if (input){ input.removeAttribute("disabled"); input.value=""; }
+      if (mark){ mark.textContent="—"; mark.className="mark"; }
+      if (steps){ steps.style.display="none"; }
+    });
+  });
+  document.getElementById("hc").addEventListener("change",(e)=>{
+    if (e.target.checked) document.documentElement.classList.add("hc");
+    else document.documentElement.classList.remove("hc");
+  });
+
+  // initial
+  buildWorksheet();
+
+  function announce(msg){
+    const live=document.getElementById("live");
+    live.textContent=""; setTimeout(()=> live.textContent=msg,10);
+  }
+
+  // ---------- dev checks ----------
+  if (DEV){
+    console.info("Developer mode: quick checks…");
+    (function(){
+      _seed=123; currentDiff=DIFF.MED; sheetSize=10; buildWorksheet();
+      // verify MED rate-missing cells use 12 months
+      const cells=[...document.querySelectorAll(".cell")];
+      const rateCells = cells.filter(c=>{
+        const inp = c.querySelector("input")?.id;
+        if (!inp) return false;
+        const lab = [...c.querySelectorAll(".kv label")].find(l=> l.getAttribute("for")===inp);
+        return lab && /Rate \(r\)/.test(lab.textContent);
+      });
+      const ok = rateCells.every(c=>{
+        const labs=[...c.querySelectorAll(".kv label")];
+        const idx=labs.findIndex(l=> l.textContent.trim()==="Time (t)");
+        if (idx<0) return false;
+        const txt=labs[idx].nextElementSibling.textContent.trim();
+        return /^12\b/.test(txt); // "12 months"
+      });
+      console.assert(ok, "MED rate-missing cells should have 12 months");
+      console.info("Checks done.");
+    })();
+  }
+})();
+</script>
+</body>
+</html>
