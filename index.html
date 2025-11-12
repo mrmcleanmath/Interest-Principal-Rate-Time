@@ -13,6 +13,7 @@
     --accent: #5dd0ff;
     --good: #2ecc71;
     --bad: #ff5c5c;
+    --warn: #ffd166;
     --outline: #31406b;
   }
   body { margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple Color Emoji","Segoe UI Emoji"; background:var(--bg); color:var(--ink); line-height:1.4; }
@@ -37,7 +38,7 @@
   .badge{ display:inline-flex; align-items:center; gap:6px; background:#0d1330; border:1px solid var(--outline); border-radius:999px; padding:4px 10px; font-size:12px; color:var(--muted); width:max-content; }
   .kv{ display:grid; grid-template-columns:auto 1fr; gap:6px 10px; align-items:center; font-size:clamp(16px,2.2vw,20px); }
   .kv label{ color:var(--muted); }
-  .val{ font-weight:700; font-variant-numeric:tabular-nums; max-width:220px; } /* prevent bleed */
+  .val{ font-weight:700; font-variant-numeric:tabular-nums; max-width:220px; } /* prevents input bleed */
   .val.mono{ font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
   .val input{ width:100%; font-size:clamp(16px,2.2vw,20px); padding:8px 10px; border-radius:10px; border:1px solid var(--outline); background:#0f1738; color:var(--ink); outline:none; }
   .val input:focus{ border-color:var(--accent); box-shadow:0 0 0 3px rgba(93,208,255,0.25); }
@@ -194,13 +195,20 @@
   };
   const TimeByTier={
     [DIFF.EASY]:[6,12],
-    [DIFF.MED]: [3,6,9,12],
+    [DIFF.MED]: [3,6,9,12],   /* used for display variety; rules below override when needed */
     [DIFF.HARD]:[1,2,3,4,5,6,7,8,9,10,11,12],
+  };
+
+  // Helper: months sets for missing I
+  const monthsForInterest = {
+    [DIFF.EASY]: [3,6,9,12],
+    [DIFF.MED]:  [1,2,3,4,5,6,7,8,9,10,11,12],
+    [DIFF.HARD]: [1,2,3,4,5,6,7,8,9,10,11,12]
   };
 
   function genOneProblem(tier){
     let miss=choice(MissingByTier[tier]);
-    if (tier!==DIFF.HARD && miss==="t") miss="I";
+    if (tier!==DIFF.HARD && miss==="t") miss="I"; // t missing only in Hard
 
     let Pmin=100,Pmax=10000,rMin=1,rMax=12;
     if (tier===DIFF.MED){ Pmin=1000; Pmax=120000; rMin=1; rMax=18; }
@@ -209,21 +217,20 @@
     const P = rnd2(randint(Pmin,Pmax) + (rand()<0.3? rand():0));
     const rPercent = rnd2(rand()*(rMax-rMin)+rMin);
 
-    // Choose time in months
-    let months = choice(TimeByTier[tier]);
-
-    // === NEW RULE ===
-    // If the missing variable is RATE in EASY or MEDIUM, force t = 12 months.
-    if ((tier===DIFF.EASY || tier===DIFF.MED) && miss==="r") {
-      months = 12;
+    // Choose months per rules
+    let months;
+    if (miss==="P" || miss==="r"){
+      months = 12; // ALWAYS 12 months for missing P or r (all tiers)
+    } else if (miss==="I"){
+      months = choice(monthsForInterest[tier]);
+    } else { // miss==="t" (Hard only)
+      months = null; // will compute from I, P, r
     }
-
-    // HARD allows rate with any months (or t missing handled below)
-    if (tier===DIFF.HARD && miss==="t" && Math.random()<0.7) months=null;
 
     let p=P, r=rPercent/100, tYears=months?(months/12):null, I=null;
 
     if (miss==="t"){
+      // Build a solvable t
       const m = choice(TimeByTier[DIFF.HARD]);
       tYears = m/12;
       p = rnd2(randint(Pmin,Pmax));
@@ -232,27 +239,29 @@
       months = null;
       return {P:p, r:r, months:null, I:I, miss:"t"};
     }
+
     if (miss==="r"){
-      // months already set above (12 for Easy/Med; chosen for Hard)
-      tYears = months/12;
+      tYears = months/12; // months forced to 12 above → 1 year
       const rp2 = rnd2(rand()*(rMax-rMin)+rMin); r=rp2/100;
       I = rnd2(p*r*tYears);
       return {P:p, r:null, months:months, I:I, miss:"r"};
     }
+
     if (miss==="P"){
-      if (!months) months=choice(TimeByTier[tier===DIFF.HARD?DIFF.HARD:DIFF.MED]);
-      tYears = months/12;
+      tYears = months/12; // months forced to 12 above → 1 year
       const rp3 = rnd2(rand()*(rMax-rMin)+rMin); r=rp3/100;
       const targetP = rnd2(randint(Pmin,Pmax));
       const targetI = rnd2(targetP*r*tYears);
       return {P:null, r:r, months:months, I:targetI, miss:"P"};
     }
+
     if (miss==="I"){
-      if (!months) months=choice(TimeByTier[tier===DIFF.HARD?DIFF.HARD:DIFF.MED]);
       tYears = months/12;
       I = rnd2(p*r*tYears);
       return {P:p, r:r, months:months, I:null, miss:"I"};
     }
+
+    // Fallback (shouldn't hit)
     I = rnd2(p*r*((months||12)/12));
     return {P:p, r:r, months:months, I:null, miss:"I"};
   }
@@ -265,11 +274,11 @@
     const allowed=MissingByTier[tier].slice();
     const problems=[];
     for (let i=0;i<sheetSize;i++){
-      const miss = allowed[i % allowed.length];
+      const wantMiss = allowed[i % allowed.length];
       let cell;
       for (let tries=0; tries<50; tries++){
         cell = genOneProblem(tier);
-        if (cell.miss===miss) break;
+        if (cell.miss===wantMiss) break;
       }
       problems.push(cell);
     }
@@ -516,23 +525,46 @@
   if (DEV){
     console.info("Developer mode: quick checks…");
     (function(){
-      _seed=123; currentDiff=DIFF.MED; sheetSize=10; buildWorksheet();
-      // verify MED rate-missing cells use 12 months
+      _seed=12345; currentDiff=DIFF.EASY; sheetSize=10; buildWorksheet();
+      // For EASY: rate- or principal-missing cells must show 12 months
       const cells=[...document.querySelectorAll(".cell")];
-      const rateCells = cells.filter(c=>{
-        const inp = c.querySelector("input")?.id;
-        if (!inp) return false;
-        const lab = [...c.querySelectorAll(".kv label")].find(l=> l.getAttribute("for")===inp);
-        return lab && /Rate \(r\)/.test(lab.textContent);
-      });
-      const ok = rateCells.every(c=>{
-        const labs=[...c.querySelectorAll(".kv label")];
-        const idx=labs.findIndex(l=> l.textContent.trim()==="Time (t)");
+      function missingLabel(cell){
+        const inp = cell.querySelector("input")?.id;
+        if (!inp) return "";
+        const lab = [...cell.querySelectorAll(".kv label")].find(l=> l.getAttribute("for")===inp);
+        return lab ? lab.textContent.trim() : "";
+      }
+      const mustBeYear = cells.filter(c=> /Rate \(r\)|Principal \(P\)/.test(missingLabel(c)));
+      const okYear = mustBeYear.every(c=>{
+        const labels=[...c.querySelectorAll(".kv label")];
+        const idx=labels.findIndex(l=> l.textContent.trim()==="Time (t)");
         if (idx<0) return false;
-        const txt=labs[idx].nextElementSibling.textContent.trim();
-        return /^12\b/.test(txt); // "12 months"
+        return /^12\b/.test(labels[idx].nextElementSibling.textContent.trim());
       });
-      console.assert(ok, "MED rate-missing cells should have 12 months");
+      console.assert(okYear,"P or r missing → t must be 12 months in EASY");
+
+      _seed=67890; currentDiff=DIFF.MED; sheetSize=10; buildWorksheet();
+      // MED: missing I months should be among 1..12
+      const medI = [...document.querySelectorAll(".cell")].filter(c=> /Interest \(I\)/.test(missingLabel(c)));
+      const okMedI = medI.every(c=>{
+        const labels=[...c.querySelectorAll(".kv label")];
+        const idx=labels.findIndex(l=> l.textContent.trim()==="Time (t)");
+        if (idx<0) return false;
+        const m=parseInt(labels[idx].nextElementSibling.textContent,10);
+        return m>=1 && m<=12;
+      });
+      console.assert(okMedI,"MED interest-missing → months 1..12");
+
+      _seed=24680; currentDiff=DIFF.HARD; sheetSize=10; buildWorksheet();
+      // HARD: P or r missing still 12 months
+      const hardYear = [...document.querySelectorAll(".cell")].filter(c=> /Rate \(r\)|Principal \(P\)/.test(missingLabel(c)));
+      const okHardYear = hardYear.every(c=>{
+        const labels=[...c.querySelectorAll(".kv label")];
+        const idx=labels.findIndex(l=> l.textContent.trim()==="Time (t)");
+        if (idx<0) return false;
+        return /^12\b/.test(labels[idx].nextElementSibling.textContent.trim());
+      });
+      console.assert(okHardYear,"P or r missing → t must be 12 months in HARD");
       console.info("Checks done.");
     })();
   }
